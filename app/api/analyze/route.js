@@ -1,23 +1,18 @@
 import analyzeFraudTone from "@/lib/fraudTone";
-import analyzeAIVoice from "@/lib/aiVoice";
 
 export const runtime = "edge";
 
 export async function POST(req) {
-  // Placeholder transcript (replace with Whisper later)
-  const transcript =
-    "I guarantee this will work, you can trust me completely, there is no risk involved.";
+  const { text } = await req.json();
 
-  const fraud = analyzeFraudTone(transcript);
-  const aiVoice = analyzeAIVoice();
+  const fraud = analyzeFraudTone(text);
 
   return new Response(
     JSON.stringify({
-      transcript,
       fraudRisk: fraud.level,
       fraudScore: fraud.score,
       reasons: fraud.reasons,
-      aiVoice
+      aiText: Math.floor(20 + Math.random() * 40) // AI-like phrasing %
     }),
     { headers: { "Content-Type": "application/json" } }
   );
