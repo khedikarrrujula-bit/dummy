@@ -2,39 +2,43 @@
 import { useState } from "react";
 
 export default function Home() {
-  const [audioBlob, setAudioBlob] = useState(null);
+  const [transcript, setTranscript] = useState("");
   const [result, setResult] = useState(null);
+  const [listening, setListening] = useState(false);
 
-  let mediaRecorder;
-  let chunks = [];
+  const startListening = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    mediaRecorder.start();
+    if (!SpeechRecognition) {
+      alert("Speech Recognition not supported in this browser");
+      return;
+    }
 
-    chunks = [];
-    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
 
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: "audio/webm" });
-      setAudioBlob(blob);
+    setListening(true);
+
+    recognition.start();
+
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      setTranscript(text);
+      setListening(false);
     };
 
-    window.recorder = mediaRecorder;
-  };
-
-  const stopRecording = () => {
-    window.recorder.stop();
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
   };
 
   const analyze = async () => {
-    const formData = new FormData();
-    formData.append("audio", audioBlob);
-
     const res = await fetch("/api/analyze", {
       method: "POST",
-      body: formData
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: transcript })
     });
 
     const data = await res.json();
@@ -45,19 +49,30 @@ export default function Home() {
     <main>
       <h1>🎤 Fraud & AI Voice Risk Analyzer</h1>
 
-      <button onClick={startRecording}>Start</button>
-      <button onClick={stopRecording}>Stop</button>
-      <button onClick={analyze} disabled={!audioBlob}>Analyze</button>
+      <button onClick={startListening}>
+        {listening ? "Listening..." : "🎙 Speak"}
+      </button>
+
+      <textarea
+        value={transcript}
+        onChange={(e) => setTranscript(e.target.value)}
+        placeholder="Your speech will appear here..."
+      />
+
+      <button onClick={analyze} disabled={!transcript}>
+        Analyze
+      </button>
 
       {result && (
         <div className="card">
-          <p><b>Transcript:</b> {result.transcript}</p>
           <p><b>Fraud Risk:</b> {result.fraudRisk}</p>
           <p><b>Fraud Score:</b> {result.fraudScore}%</p>
-          <p><b>AI Voice Probability:</b> {result.aiVoice}%</p>
+          <p><b>AI-Like Language:</b> {result.aiText}%</p>
 
           <ul>
-            {result.reasons.map((r, i) => <li key={i}>⚠️ {r}</li>)}
+            {result.reasons.map((r, i) => (
+              <li key={i}>⚠️ {r}</li>
+            ))}
           </ul>
         </div>
       )}
